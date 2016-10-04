@@ -141,120 +141,11 @@ public class JumpManager {
 	
 	
 	
-	private static void _updateNodeInstances(Long processInstanceId,NodeInstanceContainer nodeInstanceContainer, 
-			Map<NodeInformation, NodeInformation> nodeMapping, NodeContainer nodeContainer, EntityManager em) {
-    	logger.info("NODE INSTANCES");
-    	if (nodeMapping == null || nodeMapping.isEmpty()) {
-    		return;
-    	}
-    	Map<String, Long> _nodeMapping= new HashMap<String,Long>();
-    	for (Entry<NodeInformation, NodeInformation> entry:nodeMapping.entrySet()){
-    		NodeInformation from=entry.getKey();
-    		NodeInformation to=entry.getValue();
-    		logger.info("Mapping: "+entry.getKey().getName()+" " +entry.getValue().getName());
-    		_nodeMapping.put(from.getUniqueId(), to.getNodeId());
-    		
-    		
-    		//update data
-    		int updates=0;
-    		//BAMTASKSUMMARY
-    		Query bamtaskqry=em.createQuery("update BAMTaskSummaryImpl set taskName=:taskName where processInstanceId=:processInstanceId");
-    		bamtaskqry.setParameter("taskName", to.getName());
-    		bamtaskqry.setParameter("processInstanceId", processInstanceId);
-    		updates=bamtaskqry.executeUpdate();
-    		logger.info("Update BamTaskSummay: "+ updates);
-    		//AUDITTASKIMPL
-    		Query audittask= em.createQuery("update AuditTaskImpl set name=:taskName where processInstanceId=:processInstanceId");
-    		audittask.setParameter("taskName", to.getName());
-    		audittask.setParameter("processInstanceId", processInstanceId);
-    		updates=audittask.executeUpdate();
-    		logger.info("Update AuditTaskImpl: "+ updates); 
-    		//TASK
-    		Query task= em.createQuery("update TaskImpl set name=:taskName, formName=:taskName where processInstanceId=:processInstanceId and name=:oldName");
-    		task.setParameter("taskName", to.getName());
-    		task.setParameter("processInstanceId", processInstanceId);
-    		task.setParameter("oldName", from.getName());
-    		updates=task.executeUpdate();
-    		logger.info("Update Task: "+ updates); 	
-    		//NODEINSTANCELOG
-    		Query nodelog= em.createQuery("update NodeInstanceLog set nodeName=:taskName,nodeId=:nodeId, nodeType=:nodeType  where processInstanceId=:processInstanceId and nodeid=:oldNodeId");
-    		nodelog.setParameter("taskName", to.getName());
-    		nodelog.setParameter("nodeId", to.getUniqueId());        	
-    		nodelog.setParameter("processInstanceId", processInstanceId);
-    		nodelog.setParameter("oldNodeId", from.getUniqueId());
-    		nodelog.setParameter("nodeType", to.getTaskType());
-    		updates=nodelog.executeUpdate();
-    		logger.info("Update NodeInstanceLog: "+ updates);
-    		
-    		//workitem content
-    		Query wid=em.createQuery("update WorkItemInfo set name=:nodeType where processInstanceId=:processInstanceId and workItemId=:wid ");
-    		wid.setParameter("processInstanceId", processInstanceId);
-    		wid.setParameter("wid", from.getWorkItemId());
-    		wid.setParameter("nodeType", to.getTaskType());
-    		updates=wid.executeUpdate();
-    		logger.info("Update WorkItemInfo: "+ updates);
-    		
-    	}
-       
-    	/*//find node
-		Collection<NodeInstance> c=nodeInstanceContainer.getNodeInstances();
-		for(NodeInstance nInstance:c){
-			logger.info("Node Instance: "+nInstance.getId() + " - " + nInstance.getNodeId() +  " - " + nInstance.getNodeName());
-		}
-		
-		NodeInstance currentNode=nodeInstanceContainer.getNodeInstance(from.getNodeId());
-		if(currentNode!=null)
-		((NodeInstanceImpl)currentNode).setNodeId(to.getNodeId());
-		else
-			logger.warn("CurrentNode Null");*/
-    	
-    	
-    	_updateNodeInstances(nodeInstanceContainer, _nodeMapping);
-    	
-    	
-    	
-    }
 	
-    private static void _updateNodeInstances(NodeInstanceContainer nodeInstanceContainer, Map<String, Long> nodeMapping) {
-        for (NodeInstance nodeInstance : nodeInstanceContainer.getNodeInstances()) {
-            String oldNodeId = ((NodeImpl)
-                    ((org.jbpm.workflow.instance.NodeInstance) nodeInstance).getNode()).getUniqueId();
-            Long newNodeId = nodeMapping.get(oldNodeId);
-            if (newNodeId == null) {
-                newNodeId = nodeInstance.getNodeId();
-            }
-
-            // clean up iteration levels for removed (old) nodes
-            Map<String, Integer> iterLevels = ((WorkflowProcessInstanceImpl) nodeInstance.getProcessInstance()).getIterationLevels();
-            String uniqueId = (String) ((NodeImpl) nodeInstance.getNode()).getMetaData("UniqueId");
-            iterLevels.remove(uniqueId);
-            // and now set to new node id
-            ((NodeInstanceImpl) nodeInstance).setNodeId(newNodeId);
-
-            if (nodeInstance instanceof NodeInstanceContainer) {
-                _updateNodeInstances((NodeInstanceContainer) nodeInstance, nodeMapping);
-            }
-        }
-
-    }
+	
     
-    private static Long findNodeIfByUniqueId(String uniqueId, NodeContainer nodeContainer) {
-    	Long result = null;
-    	
-    	for (Node node : nodeContainer.getNodes()) {
-    		if (uniqueId.equals(node.getMetaData().get("UniqueId"))) {
-    			return node.getId();
-    		}
-    		if (node instanceof NodeContainer) {
-    			result = findNodeIfByUniqueId(uniqueId, (NodeContainer) node);
-    			if (result != null) {
-    				return result;
-    			}
-    		}
-    	}
-    	
-    	return result;
-    }
+    
+  
     
     private static KieRuntime extractIfNeeded(KieSession ksession) {
     	if (ksession instanceof CommandBasedStatefulKnowledgeSession) {
@@ -389,7 +280,11 @@ public class JumpManager {
 			
 			NodeInstance currentNode=nodeInstanceContainer.getNodeInstance(from.getNodeId());
 			if(currentNode!=null)
-			((NodeInstanceImpl)currentNode).setNodeId(to.getNodeId());
+			{
+				((NodeInstanceImpl)currentNode).cancel();
+				((NodeInstanceImpl)currentNode).setNodeId(to.getNodeId());
+				((NodeInstanceImpl)currentNode).retrigger(true);
+			}
 			else
 				logger.warn("CurrentNode Null");
 			
