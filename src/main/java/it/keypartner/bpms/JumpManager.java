@@ -281,9 +281,9 @@ public class JumpManager {
 			NodeInstance currentNode=nodeInstanceContainer.getNodeInstance(from.getNodeId());
 			if(currentNode!=null)
 			{
-				((NodeInstanceImpl)currentNode).cancel();
+				//((NodeInstanceImpl)currentNode).cancel();
 				((NodeInstanceImpl)currentNode).setNodeId(to.getNodeId());
-				((NodeInstanceImpl)currentNode).retrigger(true);
+				//((NodeInstanceImpl)currentNode).retrigger(true);
 			}
 			else
 				logger.warn("CurrentNode Null");
